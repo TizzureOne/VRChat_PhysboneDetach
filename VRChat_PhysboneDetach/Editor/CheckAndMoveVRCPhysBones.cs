@@ -31,6 +31,10 @@ public class CheckAndMoveVRCPhysBones : Editor
         // 获取选定游戏对象及其所有子对象的变换组件
         Transform[] allchild = Selection.activeGameObject.GetComponentsInChildren<Transform>();
 
+        // 建立一个新字典，用于存放动骨碰撞数据
+        Dictionary<string, string[]> colliders = new Dictionary<string, string[]> { };
+
+
         // 遍历所有子对象的变换组件
         foreach (Transform child in allchild)
         {
@@ -50,7 +54,15 @@ public class CheckAndMoveVRCPhysBones : Editor
             {
                 // 如果动态骨骼的根变换为空，则将其设置为自身的变换
                 if (physBone.rootTransform == null) physBone.rootTransform = physBone.gameObject.transform;
-                
+
+                // 动态骨骼碰撞部分检测
+                List<string> temColliders = new List<string>();
+                foreach (VRCPhysBoneCollider temCollider in physBone.colliders)
+                {
+                    temColliders.Add(temCollider.gameObject.name);
+                }
+                colliders.Add(physBone.gameObject.name, temColliders.ToArray());
+
                 // 复制并粘贴动态骨骼组件到新的容器对象
                 UnityEditorInternal.ComponentUtility.CopyComponent(physBone);
                 UnityEditorInternal.ComponentUtility.PasteComponentAsNew(container);
@@ -72,6 +84,25 @@ public class CheckAndMoveVRCPhysBones : Editor
                 // 删除原始的碰撞器组件
                 DestroyImmediate(physBoneCollider);
             }
+        }
+
+
+        // 从字典里找到动骨组件的碰撞设置信息（主要是碰撞所在的对象的名字），把它们复制进去
+        Transform[] copychild = transferRoot.GetComponentsInChildren<Transform>();
+        foreach (Transform child in copychild)
+        {
+            bool bone = child.TryGetComponent(out VRCPhysBone temBones);
+            if (!bone) continue;
+
+            // 清除colliders的数据，防止叠加和产生missing
+            temBones.colliders.Clear();
+
+            List<VRCPhysBoneCollider> boneColliders = new List<VRCPhysBoneCollider>();
+            foreach (string copyCollider in colliders[temBones.gameObject.name])
+            {
+                boneColliders.Add(transferRoot.transform.Find(copyCollider).GetComponent<VRCPhysBoneCollider>());
+            }
+            temBones.colliders.AddRange(boneColliders);
         }
     }
 }
